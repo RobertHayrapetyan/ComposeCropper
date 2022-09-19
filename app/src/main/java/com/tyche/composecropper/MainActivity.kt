@@ -30,26 +30,33 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
+import androidx.core.view.WindowCompat
 import com.rob.cropperlib.ui.views.CropView
 import com.tyche.composecropper.ui.theme.ComposeCropperTheme
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        WindowCompat.getInsetsController(window, window.decorView).apply {
+            isAppearanceLightNavigationBars = true
+            isAppearanceLightStatusBars = true
+        }
+        window.apply {
+            navigationBarColor = ContextCompat.getColor(this@MainActivity, R.color.white)
+            statusBarColor = ContextCompat.getColor(this@MainActivity, R.color.white)
+        }
         var imageUri: Uri? = null
         val compose = mutableStateOf(false)
         var bitmap = mutableStateOf<Bitmap?>(null)
         val pickMedia =
             registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
-                // Callback is invoked after the user selects a media item or closes the
-                // photo picker.
                 imageUri = uri
                 compose.value = true
                 imageUri?.let {
                     bitmap.value = if (Build.VERSION.SDK_INT < 28) {
                         MediaStore.Images
                             .Media.getBitmap(this.contentResolver, it)
-
                     } else {
                         val source = ImageDecoder
                             .createSource(this.contentResolver, it)
