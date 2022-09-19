@@ -14,6 +14,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.material.Icon
 import androidx.compose.material.MaterialTheme
@@ -26,7 +27,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
 import com.rob.cropperlib.ui.views.CropView
 import com.tyche.composecropper.ui.theme.ComposeCropperTheme
 
@@ -69,6 +72,7 @@ class MainActivity : ComponentActivity() {
                     if (compose.value) {
                         CropView(
                             modifier = Modifier.fillMaxSize(),
+                            cropBoarderColor = Color.White,
                             backgroundColor = Color.Black,
                             toolbarColor = Color.Transparent,
                             withToolbarLeftBtn = {
@@ -78,14 +82,16 @@ class MainActivity : ComponentActivity() {
                                     contentDescription = null,
                                     modifier = Modifier.clickable {
                                         compose.value = false
-                                    }
+                                    }.padding(16.dp)
                                 )
                             },
                             withToolbarRightBtn = {
-                                Text(text = "Done", color = Color.White)
+                                Text(modifier = Modifier.clickable {
+                                    compose.value = false
+                                }.padding(16.dp), text = "Done", color = Color.White, fontWeight = FontWeight.Bold)
                             },
                             withToolbarTitle = {
-                                Text(text = "Title")
+                                Text(text = "Title", fontWeight = FontWeight.Bold)
                             },
                             bitmap = bitmap.value
                         )

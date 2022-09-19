@@ -1,9 +1,6 @@
 package com.rob.cropperlib.ui.views
 
 import android.graphics.Bitmap
-import android.graphics.RectF
-import android.view.WindowInsetsAnimation
-import android.widget.ImageView
 import androidx.compose.foundation.*
 import androidx.compose.foundation.gestures.*
 import androidx.compose.foundation.layout.*
@@ -11,18 +8,14 @@ import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.*
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.tooling.preview.Preview
@@ -30,11 +23,28 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import kotlin.properties.Delegates
 
-@Preview
+const val aspectRatio = 3/4f
+
+var containerWidth by Delegates.notNull<Float>()
+var containerHeight by Delegates.notNull<Float>()
+
+var imageHeight by Delegates.notNull<Int>()
+var imageWidth by Delegates.notNull<Int>()
+
+lateinit var overlayBounds : Rect
+
+val scale = mutableStateOf(1f)
+val scaleToOverlayBounds = mutableStateOf(1f)
+val offsetX = mutableStateOf(0f)
+val offsetY = mutableStateOf(0f)
+val imageCenter = mutableStateOf(Offset.Zero)
+
 @Composable
 fun CropView(
     modifier: Modifier = Modifier,
+    cropBoarderColor: Color = Color.White,
     backgroundColor: Color = Color.White,
     toolbarColor: Color = Color.White,
     toolbarHeight: Dp = 56.dp,
@@ -42,96 +52,37 @@ fun CropView(
     withToolbarRightBtn: @Composable (() -> Unit)? = null,
     withToolbarTitle: @Composable (() -> Unit)? = null,
     bitmap: Bitmap? = null,
+    maxScale: Float = 5f,
+    minScale: Float = 0.1f,
 ) {
     if (bitmap != null) {
         BoxWithConstraints(
-            modifier = Modifier
-                .fillMaxSize()
+            modifier = modifier
         ) {
 
             val lifecycleOwner = LocalLifecycleOwner.current
 
-
-
-            val maxScale = 5f
-            val minScale = 0.5f
-
-            val containerWidth = with(LocalDensity.current) { maxWidth.toPx() }
-            val containerHeight = with(LocalDensity.current) { maxHeight.toPx() }
+            containerWidth = with(LocalDensity.current) { maxWidth.toPx() }
+            containerHeight = with(LocalDensity.current) { maxHeight.toPx() }
 
             val left = 40f
             val top = (containerHeight - (containerWidth - 80f) * 4 / 3) / 2
             val right = containerWidth - 40f
             val bottom = containerHeight - (containerHeight - (containerWidth - 80f) * 4 / 3) / 2
 
-            val overlayBounds = Rect(
-                left,
-                top,
-                right,
-                bottom
-            )
+            overlayBounds = Rect(left, top, right, bottom)
 
-            val aspectRatio = 3/4f
-            val scale = remember {
-                mutableStateOf(
-                    1f
-                )
-            }
-
-            val imageHeight = bitmap.height //* scale.value
-            val imageWidth = bitmap.width //* scale.value
-            val imageBounds = RectF()
-
-            val offsetX = remember {
-                mutableStateOf(-imageWidth/2f*scale.value)
-            }
-            val offsetY = remember {
-                mutableStateOf(-imageHeight/2f*scale.value)
-            }
-
-            val rotationState = remember { mutableStateOf(1f) }
-
-            val imageCenter = remember {
-                mutableStateOf(Offset.Zero)
-            }
+            imageHeight = bitmap.height
+            imageWidth = bitmap.width
 
             DisposableEffect(lifecycleOwner) {
                 val observer = LifecycleEventObserver { _, event ->
                     if (event == Lifecycle.Event.ON_RESUME) {
-                        when {
-                            // If image inside overlay
-                            (imageWidth < overlayBounds.width && imageHeight < overlayBounds.height) -> {
-                                if ( imageWidth/imageHeight.toFloat() < aspectRatio) {
-                                    scale.value *= overlayBounds.width / (imageWidth * scale.value)
-                                } else {
-                                    scale.value *= overlayBounds.height / (imageHeight * scale.value)
-                                }
-                            }
-                            // If image width less then overlay width
-                            (imageWidth < overlayBounds.width && imageHeight >= overlayBounds.height)->{
-                                scale.value *= overlayBounds.width / (imageWidth * scale.value)
-                            }
-                            // If image height less then overlay height
-                            (imageWidth >= overlayBounds.width && imageHeight < overlayBounds.height)->{
-                                scale.value *= overlayBounds.height / (imageHeight * scale.value)
-                            }
-                            // If image outside the overlay
-                            (imageWidth >= overlayBounds.width && imageHeight >= overlayBounds.height)->{
-                                if (imageWidth/imageHeight.toFloat() < aspectRatio) {
-                                    scale.value *= overlayBounds.width / (imageWidth * scale.value)
-                                } else {
-                                    scale.value *= overlayBounds.height / (imageHeight * scale.value)
-                                }
-                            }
-                        }
-                        offsetX.value = -imageWidth / 2f * scale.value
-                        offsetY.value = -imageHeight / 2f * scale.value
+                        zoomToOverlayBounds(minScale, maxScale)
                     }
                 }
-                // Add the observer to the lifecycle
                 lifecycleOwner.lifecycle.addObserver(observer)
 
-                // When the effect leaves the Composition, remove the observer
                 onDispose {
                     lifecycleOwner.lifecycle.removeObserver(observer)
                 }
@@ -157,10 +108,10 @@ fun CropView(
                                         val offset = event.calculatePan()
                                         offsetX.value += offset.x
                                         offsetY.value += offset.y
-//                                        offsetX.value = -imageWidth / 2f * scale.value + offset.x
-//                                        offsetY.value = -imageHeight / 2f * scale.value + offset.y
-                                        rotationState.value += event.calculateRotation()
                                     } while (event.changes.any { it.pressed })
+                                }
+                                if (scale.value < scaleToOverlayBounds.value){
+                                    zoomToOverlayBounds(minScale, maxScale)
                                 }
                                 if (offsetX.value > -overlayBounds.width/2){
                                     offsetX.value = -overlayBounds.width/2
@@ -192,7 +143,6 @@ fun CropView(
                             imageCenter.value = this.center
                         }) {
                             drawImage(bitmap.asImageBitmap(), topLeft = overlayBounds.center)
-//                            zoomToOverlayBounds()
                         }
 
                         clipPath(rectPath, clipOp = ClipOp.Difference) {
@@ -203,7 +153,7 @@ fun CropView(
                             )
                         }
                         drawRect(
-                            color = Color.Yellow,
+                            color = cropBoarderColor,
                             topLeft = Offset(
                                 40f,
                                 (canvasHeight - (canvasWidth - 80f) * 4 / 3) / 2
@@ -232,8 +182,7 @@ fun CropView(
                     .fillMaxWidth()
                     .height(toolbarHeight)
                     .align(Alignment.TopCenter)
-                    .background(toolbarColor)
-                    .padding(vertical = 8.dp, horizontal = 16.dp),
+                    .background(toolbarColor),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
@@ -248,11 +197,39 @@ fun CropView(
                 }
             }
         }
-
-
     }
 }
 
-fun zoomToOverlayBounds() {
-    TODO("Not yet implemented")
+fun zoomToOverlayBounds(minScale: Float, maxScale: Float) {
+    when {
+        // If image inside overlay
+        (imageWidth < overlayBounds.width && imageHeight < overlayBounds.height) -> {
+            if ( imageWidth/imageHeight.toFloat() < aspectRatio) {
+                scale.value *= overlayBounds.width / (imageWidth * scale.value)
+            } else {
+                scale.value *= overlayBounds.height / (imageHeight * scale.value)
+            }
+        }
+        // If image width less then overlay width
+        (imageWidth < overlayBounds.width && imageHeight >= overlayBounds.height)->{
+            scale.value *= overlayBounds.width / (imageWidth * scale.value)
+        }
+        // If image height less then overlay height
+        (imageWidth >= overlayBounds.width && imageHeight < overlayBounds.height)->{
+            scale.value *= overlayBounds.height / (imageHeight * scale.value)
+        }
+        // If image outside the overlay
+        (imageWidth >= overlayBounds.width && imageHeight >= overlayBounds.height)->{
+            if (imageWidth/imageHeight.toFloat() < aspectRatio) {
+                scale.value *= overlayBounds.width / (imageWidth * scale.value)
+            } else {
+                scale.value *= overlayBounds.height / (imageHeight * scale.value)
+            }
+        }
+    }
+    scale.value = maxOf(minScale, minOf(maxScale, scale.value))
+    scaleToOverlayBounds.value = scale.value
+    offsetX.value = -imageWidth / 2f * scale.value
+    offsetY.value = -imageHeight / 2f * scale.value
 }
+
