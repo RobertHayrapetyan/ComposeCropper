@@ -9,3 +9,4 @@ val Teal200 = Color(0xFF03DAC5)
 
 
 val backgroundPrimaryInverseOpacity50 = Color(0x7F252627)
+val backgroundPrimaryOpacity50 = Color(0x7FFFFFFF)

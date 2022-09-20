@@ -7,7 +7,6 @@ import android.os.Build
 import android.os.Bundle
 import android.provider.MediaStore
 import androidx.activity.ComponentActivity
-import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -20,15 +19,14 @@ import androidx.compose.material.Icon
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Surface
 import androidx.compose.material.Text
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
@@ -48,7 +46,7 @@ class MainActivity : ComponentActivity() {
         }
         var imageUri: Uri? = null
         val compose = mutableStateOf(false)
-        var bitmap = mutableStateOf<Bitmap?>(null)
+        val bitmap = mutableStateOf<Bitmap?>(null)
         val pickMedia =
             registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
                 imageUri = uri
@@ -71,6 +69,7 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colors.background
                 ) {
+                    var shouldShowOverlay by remember { mutableStateOf(false)}
                     Column(modifier = Modifier.wrapContentSize()) {
                         Text(modifier = Modifier.clickable {
                             pickMedia.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
@@ -80,6 +79,7 @@ class MainActivity : ComponentActivity() {
                         CropView(
                             modifier = Modifier.fillMaxSize(),
                             cropBoarderColor = Color.White,
+
                             backgroundColor = Color.Black,
                             toolbarColor = Color.Transparent,
                             withToolbarLeftBtn = {
@@ -87,32 +87,31 @@ class MainActivity : ComponentActivity() {
                                     painter = painterResource(id = R.drawable.ic_baseline_arrow_back_ios_24),
                                     tint = Color.White,
                                     contentDescription = null,
-                                    modifier = Modifier.clickable {
-                                        compose.value = false
-                                    }.padding(16.dp)
+                                    modifier = Modifier
+                                        .clickable {
+                                            compose.value = false
+                                            shouldShowOverlay = false
+                                        }
+                                        .padding(16.dp)
                                 )
                             },
                             withToolbarRightBtn = {
-                                Text(modifier = Modifier.clickable {
-                                    compose.value = false
-                                }.padding(16.dp), text = "Done", color = Color.White, fontWeight = FontWeight.Bold)
+                                Text(modifier = Modifier
+                                    .clickable {
+                                        shouldShowOverlay = true
+                                    }
+                                    .padding(16.dp), text = "Done", color = Color.White, fontWeight = FontWeight.Bold)
                             },
                             withToolbarTitle = {
                                 Text(text = "Title", fontWeight = FontWeight.Bold)
                             },
+                            progressLabel = "Photo is being processed",
+                            shouldShowOverlay = shouldShowOverlay,
                             bitmap = bitmap.value
                         )
                     }
                 }
             }
         }
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-fun DefaultPreview() {
-    ComposeCropperTheme {
-        CropView()
     }
 }

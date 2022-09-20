@@ -32,6 +32,7 @@ android {
             excludes += '/META-INF/{AL2.0,LGPL2.1}'
         }
     }
+    namespace 'com.rob.cropperlib'
 }
 
 dependencies {
@@ -51,4 +52,5 @@ dependencies {
     debugImplementation "androidx.compose.ui:ui-test-manifest:$compose_version"
 
     implementation "io.coil-kt:coil-compose:2.0.0-rc01"
+    implementation "com.airbnb.android:lottie-compose:5.2.0"
 }

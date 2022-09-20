@@ -3,10 +3,12 @@ package com.rob.cropperlib.ui.views
 import android.graphics.Bitmap
 import androidx.compose.foundation.*
 import androidx.compose.foundation.gestures.*
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -18,11 +20,15 @@ import androidx.compose.ui.graphics.drawscope.*
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLifecycleOwner
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import com.airbnb.lottie.compose.*
+import com.rob.cropperlib.R
 import kotlin.properties.Delegates
 
 const val aspectRatio = 3/4f
@@ -33,7 +39,7 @@ var containerHeight by Delegates.notNull<Float>()
 var imageHeight by Delegates.notNull<Int>()
 var imageWidth by Delegates.notNull<Int>()
 
-lateinit var overlayBounds : Rect
+lateinit var cropAreaBounds : Rect
 
 val scale = mutableStateOf(1f)
 val scaleToOverlayBounds = mutableStateOf(1f)
@@ -44,7 +50,7 @@ val imageCenter = mutableStateOf(Offset.Zero)
 @Composable
 fun CropView(
     modifier: Modifier = Modifier,
-    cropBoarderColor: Color = Color.White,
+    cropBoarderColor: Color = Color.Yellow,
     backgroundColor: Color = Color.White,
     toolbarColor: Color = Color.White,
     toolbarHeight: Dp = 56.dp,
@@ -54,10 +60,12 @@ fun CropView(
     bitmap: Bitmap? = null,
     maxScale: Float = 5f,
     minScale: Float = 0.1f,
+    progressLabel: String = "",
+    shouldShowOverlay: Boolean = false
 ) {
     if (bitmap != null) {
         BoxWithConstraints(
-            modifier = modifier
+            modifier = modifier.background(backgroundColor)
         ) {
 
             val lifecycleOwner = LocalLifecycleOwner.current
@@ -70,7 +78,7 @@ fun CropView(
             val right = containerWidth - 40f
             val bottom = containerHeight - (containerHeight - (containerWidth - 80f) * 4 / 3) / 2
 
-            overlayBounds = Rect(left, top, right, bottom)
+            cropAreaBounds = Rect(left, top, right, bottom)
 
             imageHeight = bitmap.height
             imageWidth = bitmap.width
@@ -78,7 +86,8 @@ fun CropView(
             DisposableEffect(lifecycleOwner) {
                 val observer = LifecycleEventObserver { _, event ->
                     if (event == Lifecycle.Event.ON_RESUME) {
-                        zoomToOverlayBounds(minScale, maxScale)
+                        zoomToCropAreaBounds(minScale, maxScale)
+                        moveToCenter()
                     }
                 }
                 lifecycleOwner.lifecycle.addObserver(observer)
@@ -97,42 +106,37 @@ fun CropView(
                         .fillMaxSize()
                         .align(Alignment.Center)
                         .pointerInput(Unit) {
-                            forEachGesture {
-                                awaitPointerEventScope {
-                                    awaitFirstDown()
-                                    do {
-                                        val event = awaitPointerEvent()
-                                        scale.value *= event.calculateZoom()
-                                        if (scale.value <= minScale) scale.value = minScale
-                                        if (scale.value >= maxScale) scale.value = maxScale
-                                        val offset = event.calculatePan()
-                                        offsetX.value += offset.x
-                                        offsetY.value += offset.y
-                                    } while (event.changes.any { it.pressed })
-                                }
-                                if (scale.value < scaleToOverlayBounds.value){
-                                    zoomToOverlayBounds(minScale, maxScale)
-                                }
-                                if (offsetX.value > -overlayBounds.width/2){
-                                    offsetX.value = -overlayBounds.width/2
-                                }
-                                if (offsetX.value + imageWidth*scale.value < overlayBounds.width/2){
-                                    offsetX.value = overlayBounds.width/2 - imageWidth*scale.value
-                                }
-                                if (offsetY.value > -overlayBounds.height/2){
-                                    offsetY.value = -overlayBounds.height/2
-                                }
-                                if (offsetY.value + imageHeight*scale.value < overlayBounds.height/2){
-                                    offsetY.value = overlayBounds.height/2 - imageHeight*scale.value
-                                }
-                            }
+                                            detectTransformGestures { centroid, pan, zoom, rotation ->
+                                                scale.value *= zoom
+                                                if (scale.value <= minScale) scale.value = minScale
+                                                if (scale.value >= maxScale) scale.value = maxScale
+                                                offsetX.value += pan.x
+                                                offsetY.value += pan.y
+                                                moveToCropAreaPosition(minScale, maxScale)
+                                            }
+
+//                            forEachGesture {
+//                                awaitPointerEventScope {
+//                                    awaitFirstDown()
+//                                    do {
+//                                        val event = awaitPointerEvent()
+//                                        scale.value *= event.calculateZoom()
+//                                        if (scale.value <= minScale) scale.value = minScale
+//                                        if (scale.value >= maxScale) scale.value = maxScale
+//                                        val offset = event.calculatePan()
+//                                        offsetX.value += offset.x
+//                                        offsetY.value += offset.y
+//                                    } while (event.changes.any { it.pressed })
+//                                }
+//                                moveToCropAreaPosition(minScale, maxScale)
+//                            }
                         },
                     onDraw = {
                         val canvasWidth = size.width
                         val canvasHeight = size.height
 
                         val rectPath = Path().apply {
-                            addRect(overlayBounds)
+                            addRect(cropAreaBounds)
                         }
                         withTransform({
                             translate(offsetX.value, offsetY.value)
@@ -142,7 +146,7 @@ fun CropView(
                             )
                             imageCenter.value = this.center
                         }) {
-                            drawImage(bitmap.asImageBitmap(), topLeft = overlayBounds.center)
+                            drawImage(bitmap.asImageBitmap(), topLeft = cropAreaBounds.center)
                         }
 
                         clipPath(rectPath, clipOp = ClipOp.Difference) {
@@ -163,72 +167,129 @@ fun CropView(
                         )
                     })
             }
-            Column(
-                modifier = Modifier
-                    .wrapContentSize()
-                    .padding(15.dp)
-                    .align(Alignment.BottomEnd)
-            ) {
-                Text(text = "X: ${offsetX.value}")
-                Text(text = "Y: ${offsetY.value}")
-                Text(text = "S: ${scale.value}")
-                Text(text = "Image sizes: ${imageWidth}x${imageHeight}")
-                Text(text = "Container sizes: ${overlayBounds.topLeft}")
-                Text(text = "Image Center: ${imageCenter.value}")
-            }
+//            Column(
+//                modifier = Modifier
+//                    .wrapContentSize()
+//                    .padding(15.dp)
+//                    .align(Alignment.BottomEnd)
+//            ) {
+//                Text(text = "X: ${offsetX.value}")
+//                Text(text = "Y: ${offsetY.value}")
+//                Text(text = "S: ${scale.value}")
+//                Text(text = "Image sizes: ${imageWidth}x${imageHeight}")
+//                Text(text = "Container sizes: ${overlayBounds.topLeft}")
+//                Text(text = "Image Center: ${imageCenter.value}")
+//            }
 
-            Row(
-                modifier = Modifier
+            Column(
+                modifier
                     .fillMaxWidth()
-                    .height(toolbarHeight)
-                    .align(Alignment.TopCenter)
-                    .background(toolbarColor),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                if (withToolbarLeftBtn != null) {
-                    withToolbarLeftBtn()
+                    .align(Alignment.TopCenter)) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(toolbarHeight)
+                        .background(toolbarColor),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    if (withToolbarLeftBtn != null) {
+                        withToolbarLeftBtn()
+                    }
+                    if (withToolbarTitle != null) {
+                        withToolbarTitle()
+                    }
+                    if (withToolbarRightBtn != null) {
+                        withToolbarRightBtn()
+                    }
                 }
-                if (withToolbarTitle != null) {
-                    withToolbarTitle()
-                }
-                if (withToolbarRightBtn != null) {
-                    withToolbarRightBtn()
+                Text(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = progressLabel,
+                    fontSize = 24.sp,
+                    color = Color.White,
+                    textAlign = TextAlign.Center,
+                    fontWeight = FontWeight.Thin
+                )
+            }
+            if (shouldShowOverlay){
+                Box(modifier = Modifier
+                    .fillMaxSize()
+                    .clickable (
+                        interactionSource = MutableInteractionSource(),
+                        indication = null,
+                        onClick = {}
+                            )
+                    .background(backgroundPrimaryOpacity50)){
+                    Loader(modifier = Modifier.align(Alignment.Center))
                 }
             }
         }
     }
 }
 
-fun zoomToOverlayBounds(minScale: Float, maxScale: Float) {
+@Composable
+fun Loader(modifier: Modifier) {
+    val composition by rememberLottieComposition(LottieCompositionSpec.RawRes(R.raw.spinner_animation_2))
+    val progress by animateLottieCompositionAsState(composition = composition,
+        iterations = LottieConstants.IterateForever)
+    LottieAnimation(
+        modifier = modifier.size(90.dp),
+        composition = composition,
+        progress = { progress },
+    )
+}
+
+private fun moveToCropAreaPosition(minScale: Float, maxScale: Float) {
+    if (scale.value < scaleToOverlayBounds.value) {
+        zoomToCropAreaBounds(minScale, maxScale)
+    }
+    if (offsetX.value > -cropAreaBounds.width / 2) {
+        offsetX.value = -cropAreaBounds.width / 2
+    }
+    if (offsetX.value + imageWidth * scale.value < cropAreaBounds.width / 2) {
+        offsetX.value = cropAreaBounds.width / 2 - imageWidth * scale.value
+    }
+    if (offsetY.value > -cropAreaBounds.height / 2) {
+        offsetY.value = -cropAreaBounds.height / 2
+    }
+    if (offsetY.value + imageHeight * scale.value < cropAreaBounds.height / 2) {
+        offsetY.value = cropAreaBounds.height / 2 - imageHeight * scale.value
+    }
+}
+
+private fun zoomToCropAreaBounds(minScale: Float, maxScale: Float) {
     when {
         // If image inside overlay
-        (imageWidth < overlayBounds.width && imageHeight < overlayBounds.height) -> {
+        (imageWidth < cropAreaBounds.width && imageHeight < cropAreaBounds.height) -> {
             if ( imageWidth/imageHeight.toFloat() < aspectRatio) {
-                scale.value *= overlayBounds.width / (imageWidth * scale.value)
+                scale.value *= cropAreaBounds.width / (imageWidth * scale.value)
             } else {
-                scale.value *= overlayBounds.height / (imageHeight * scale.value)
+                scale.value *= cropAreaBounds.height / (imageHeight * scale.value)
             }
         }
         // If image width less then overlay width
-        (imageWidth < overlayBounds.width && imageHeight >= overlayBounds.height)->{
-            scale.value *= overlayBounds.width / (imageWidth * scale.value)
+        (imageWidth < cropAreaBounds.width && imageHeight >= cropAreaBounds.height)->{
+            scale.value *= cropAreaBounds.width / (imageWidth * scale.value)
         }
         // If image height less then overlay height
-        (imageWidth >= overlayBounds.width && imageHeight < overlayBounds.height)->{
-            scale.value *= overlayBounds.height / (imageHeight * scale.value)
+        (imageWidth >= cropAreaBounds.width && imageHeight < cropAreaBounds.height)->{
+            scale.value *= cropAreaBounds.height / (imageHeight * scale.value)
         }
         // If image outside the overlay
-        (imageWidth >= overlayBounds.width && imageHeight >= overlayBounds.height)->{
+        (imageWidth >= cropAreaBounds.width && imageHeight >= cropAreaBounds.height)->{
             if (imageWidth/imageHeight.toFloat() < aspectRatio) {
-                scale.value *= overlayBounds.width / (imageWidth * scale.value)
+                scale.value *= cropAreaBounds.width / (imageWidth * scale.value)
             } else {
-                scale.value *= overlayBounds.height / (imageHeight * scale.value)
+                scale.value *= cropAreaBounds.height / (imageHeight * scale.value)
             }
         }
     }
     scale.value = maxOf(minScale, minOf(maxScale, scale.value))
     scaleToOverlayBounds.value = scale.value
+}
+
+private fun moveToCenter() {
     offsetX.value = -imageWidth / 2f * scale.value
     offsetY.value = -imageHeight / 2f * scale.value
 }
