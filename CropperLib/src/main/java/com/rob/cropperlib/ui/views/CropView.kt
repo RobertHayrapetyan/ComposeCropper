@@ -31,7 +31,6 @@ import com.airbnb.lottie.compose.*
 import com.rob.cropperlib.R
 import kotlin.properties.Delegates
 
-const val aspectRatio = 3/4f
 
 var containerWidth by Delegates.notNull<Float>()
 var containerHeight by Delegates.notNull<Float>()
@@ -39,13 +38,16 @@ var containerHeight by Delegates.notNull<Float>()
 var imageHeight by Delegates.notNull<Int>()
 var imageWidth by Delegates.notNull<Int>()
 
-lateinit var cropAreaBounds : Rect
+lateinit var cropAreaBounds: Rect
 
 val scale = mutableStateOf(1f)
 val scaleToOverlayBounds = mutableStateOf(1f)
 val offsetX = mutableStateOf(0f)
 val offsetY = mutableStateOf(0f)
 val imageCenter = mutableStateOf(Offset.Zero)
+
+val minimalScale = mutableStateOf(0.1f)
+val maximalScale = mutableStateOf(5f)
 
 @Composable
 fun CropView(
@@ -60,6 +62,7 @@ fun CropView(
     bitmap: Bitmap? = null,
     maxScale: Float = 5f,
     minScale: Float = 0.1f,
+    aspectRatio: Float = 3 / 4f,
     progressLabel: String = "",
     shouldShowOverlay: Boolean = false
 ) {
@@ -67,16 +70,16 @@ fun CropView(
         BoxWithConstraints(
             modifier = modifier.background(backgroundColor)
         ) {
-
             val lifecycleOwner = LocalLifecycleOwner.current
+
 
             containerWidth = with(LocalDensity.current) { maxWidth.toPx() }
             containerHeight = with(LocalDensity.current) { maxHeight.toPx() }
 
             val left = 40f
-            val top = (containerHeight - (containerWidth - 80f) * 4 / 3) / 2
+            val top = (containerHeight - (containerWidth - 80f) / aspectRatio) / 2
             val right = containerWidth - 40f
-            val bottom = containerHeight - (containerHeight - (containerWidth - 80f) * 4 / 3) / 2
+            val bottom = containerHeight - (containerHeight - (containerWidth - 80f) / aspectRatio) / 2
 
             cropAreaBounds = Rect(left, top, right, bottom)
 
@@ -86,7 +89,9 @@ fun CropView(
             DisposableEffect(lifecycleOwner) {
                 val observer = LifecycleEventObserver { _, event ->
                     if (event == Lifecycle.Event.ON_RESUME) {
-                        zoomToCropAreaBounds(minScale, maxScale)
+                        minimalScale.value = minScale
+                        maximalScale.value = maxScale
+                        zoomToCropAreaBounds(minimalScale.value, maximalScale.value, aspectRatio)
                         moveToCenter()
                     }
                 }
@@ -106,30 +111,18 @@ fun CropView(
                         .fillMaxSize()
                         .align(Alignment.Center)
                         .pointerInput(Unit) {
-                                            detectTransformGestures { centroid, pan, zoom, rotation ->
-                                                scale.value *= zoom
-                                                if (scale.value <= minScale) scale.value = minScale
-                                                if (scale.value >= maxScale) scale.value = maxScale
-                                                offsetX.value += pan.x
-                                                offsetY.value += pan.y
-                                                moveToCropAreaPosition(minScale, maxScale)
-                                            }
+                            detectTransformGestures { _, pan, zoom, _ ->
+                                scale.value = maxOf(minScale, minOf(maxScale, scale.value * zoom))
 
-//                            forEachGesture {
-//                                awaitPointerEventScope {
-//                                    awaitFirstDown()
-//                                    do {
-//                                        val event = awaitPointerEvent()
-//                                        scale.value *= event.calculateZoom()
-//                                        if (scale.value <= minScale) scale.value = minScale
-//                                        if (scale.value >= maxScale) scale.value = maxScale
-//                                        val offset = event.calculatePan()
-//                                        offsetX.value += offset.x
-//                                        offsetY.value += offset.y
-//                                    } while (event.changes.any { it.pressed })
-//                                }
-//                                moveToCropAreaPosition(minScale, maxScale)
-//                            }
+                                offsetX.value += pan.x
+                                offsetY.value += pan.y
+                                if ((zoom > 1 || zoom < 1) && (scale.value >= minimalScale.value && scale.value < maxScale)) {
+                                    offsetX.value *= zoom
+                                    offsetY.value *= zoom
+                                }
+                                moveToCropAreaPosition(minScale, maxScale, aspectRatio)
+                            }
+
                         },
                     onDraw = {
                         val canvasWidth = size.width
@@ -167,24 +160,12 @@ fun CropView(
                         )
                     })
             }
-//            Column(
-//                modifier = Modifier
-//                    .wrapContentSize()
-//                    .padding(15.dp)
-//                    .align(Alignment.BottomEnd)
-//            ) {
-//                Text(text = "X: ${offsetX.value}")
-//                Text(text = "Y: ${offsetY.value}")
-//                Text(text = "S: ${scale.value}")
-//                Text(text = "Image sizes: ${imageWidth}x${imageHeight}")
-//                Text(text = "Container sizes: ${overlayBounds.topLeft}")
-//                Text(text = "Image Center: ${imageCenter.value}")
-//            }
 
             Column(
                 modifier
                     .fillMaxWidth()
-                    .align(Alignment.TopCenter)) {
+                    .align(Alignment.TopCenter)
+            ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -212,15 +193,15 @@ fun CropView(
                     fontWeight = FontWeight.Thin
                 )
             }
-            if (shouldShowOverlay){
+            if (shouldShowOverlay) {
                 Box(modifier = Modifier
                     .fillMaxSize()
-                    .clickable (
+                    .clickable(
                         interactionSource = MutableInteractionSource(),
                         indication = null,
                         onClick = {}
-                            )
-                    .background(backgroundPrimaryOpacity50)){
+                    )
+                    .background(backgroundPrimaryOpacity50)) {
                     Loader(modifier = Modifier.align(Alignment.Center))
                 }
             }
@@ -231,8 +212,10 @@ fun CropView(
 @Composable
 fun Loader(modifier: Modifier) {
     val composition by rememberLottieComposition(LottieCompositionSpec.RawRes(R.raw.spinner_animation_2))
-    val progress by animateLottieCompositionAsState(composition = composition,
-        iterations = LottieConstants.IterateForever)
+    val progress by animateLottieCompositionAsState(
+        composition = composition,
+        iterations = LottieConstants.IterateForever
+    )
     LottieAnimation(
         modifier = modifier.size(90.dp),
         composition = composition,
@@ -240,9 +223,9 @@ fun Loader(modifier: Modifier) {
     )
 }
 
-private fun moveToCropAreaPosition(minScale: Float, maxScale: Float) {
+private fun moveToCropAreaPosition(minScale: Float, maxScale: Float, aspectRatio: Float) {
     if (scale.value < scaleToOverlayBounds.value) {
-        zoomToCropAreaBounds(minScale, maxScale)
+        zoomToCropAreaBounds(minScale, maxScale, aspectRatio)
     }
     if (offsetX.value > -cropAreaBounds.width / 2) {
         offsetX.value = -cropAreaBounds.width / 2
@@ -258,34 +241,37 @@ private fun moveToCropAreaPosition(minScale: Float, maxScale: Float) {
     }
 }
 
-private fun zoomToCropAreaBounds(minScale: Float, maxScale: Float) {
+private fun zoomToCropAreaBounds(minScale: Float, maxScale: Float, aspectRatio: Float) {
     when {
         // If image inside overlay
         (imageWidth < cropAreaBounds.width && imageHeight < cropAreaBounds.height) -> {
-            if ( imageWidth/imageHeight.toFloat() < aspectRatio) {
+            if (imageWidth / imageHeight.toFloat() < aspectRatio) {
                 scale.value *= cropAreaBounds.width / (imageWidth * scale.value)
             } else {
                 scale.value *= cropAreaBounds.height / (imageHeight * scale.value)
             }
         }
         // If image width less then overlay width
-        (imageWidth < cropAreaBounds.width && imageHeight >= cropAreaBounds.height)->{
+        (imageWidth < cropAreaBounds.width && imageHeight >= cropAreaBounds.height) -> {
             scale.value *= cropAreaBounds.width / (imageWidth * scale.value)
         }
         // If image height less then overlay height
-        (imageWidth >= cropAreaBounds.width && imageHeight < cropAreaBounds.height)->{
+        (imageWidth >= cropAreaBounds.width && imageHeight < cropAreaBounds.height) -> {
             scale.value *= cropAreaBounds.height / (imageHeight * scale.value)
+
         }
         // If image outside the overlay
-        (imageWidth >= cropAreaBounds.width && imageHeight >= cropAreaBounds.height)->{
-            if (imageWidth/imageHeight.toFloat() < aspectRatio) {
+        (imageWidth >= cropAreaBounds.width && imageHeight >= cropAreaBounds.height) -> {
+            if (imageWidth / imageHeight.toFloat() < aspectRatio) {
                 scale.value *= cropAreaBounds.width / (imageWidth * scale.value)
             } else {
                 scale.value *= cropAreaBounds.height / (imageHeight * scale.value)
             }
         }
     }
+    minimalScale.value = scale.value
     scale.value = maxOf(minScale, minOf(maxScale, scale.value))
+
     scaleToOverlayBounds.value = scale.value
 }
 
