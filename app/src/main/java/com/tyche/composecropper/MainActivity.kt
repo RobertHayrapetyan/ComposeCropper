@@ -10,11 +10,10 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.wrapContentSize
+import androidx.compose.foundation.layout.*
 import androidx.compose.material.Icon
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Surface
@@ -23,8 +22,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -47,6 +48,7 @@ class MainActivity : ComponentActivity() {
         var imageUri: Uri? = null
         val compose = mutableStateOf(false)
         val bitmap = mutableStateOf<Bitmap?>(null)
+        val croppedBitmap = mutableStateOf<Bitmap?>(null)
         val pickMedia =
             registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
                 imageUri = uri
@@ -76,39 +78,63 @@ class MainActivity : ComponentActivity() {
                         }, text = "Text")
                     }
                     if (compose.value) {
-                        CropView(
-                            modifier = Modifier.fillMaxSize(),
-                            cropBoarderColor = Color.White,
+                        Box(modifier = Modifier.fillMaxSize()) {
+                            CropView(
+                                modifier = Modifier.fillMaxSize(),
+                                cropBoarderColor = Color.White,
 
-                            backgroundColor = Color.Black,
-                            toolbarColor = Color.Transparent,
-                            withToolbarLeftBtn = {
-                                Icon(
-                                    painter = painterResource(id = R.drawable.ic_baseline_arrow_back_ios_24),
-                                    tint = Color.White,
-                                    contentDescription = null,
-                                    modifier = Modifier
+                                backgroundColor = Color.Black,
+                                toolbarColor = Color.Transparent,
+                                withToolbarLeftBtn = {
+                                    Icon(
+                                        painter = painterResource(id = R.drawable.ic_baseline_arrow_back_ios_24),
+                                        tint = Color.White,
+                                        contentDescription = null,
+                                        modifier = Modifier
+                                            .clickable {
+                                                compose.value = false
+                                                shouldShowOverlay = false
+                                            }
+                                            .padding(16.dp)
+                                    )
+                                },
+                                withToolbarRightBtn = {
+                                    Text(modifier = Modifier
                                         .clickable {
-                                            compose.value = false
-                                            shouldShowOverlay = false
+                                            shouldShowOverlay = true
                                         }
-                                        .padding(16.dp)
-                                )
-                            },
-                            withToolbarRightBtn = {
-                                Text(modifier = Modifier
-                                    .clickable {
-                                        shouldShowOverlay = true
-                                    }
-                                    .padding(16.dp), text = "Done", color = Color.White, fontWeight = FontWeight.Bold)
-                            },
-                            withToolbarTitle = {
-                                Text(text = "Title", fontWeight = FontWeight.Bold)
-                            },
-                            progressLabel = "Photo is being processed",
-                            shouldShowOverlay = shouldShowOverlay,
-                            bitmap = bitmap.value
-                        )
+                                        .padding(16.dp),
+                                        text = "Done",
+                                        color = Color.White,
+                                        fontWeight = FontWeight.Bold)
+                                },
+                                withToolbarTitle = {
+                                    Text(text = "Title", fontWeight = FontWeight.Bold)
+                                },
+                                progressLabel = "Photo is being processed",
+                                shouldShowOverlay = shouldShowOverlay,
+                                bitmap = bitmap.value,
+                                croppedBitmap = {
+                                    croppedBitmap.value = it
+                                }
+                            )
+                            if (croppedBitmap.value != null){
+                                Box(
+                                    modifier = Modifier
+                                        .align(Alignment.TopEnd)
+                                        .padding(10.dp)
+                                        .width(100.dp)
+                                        .aspectRatio(3 / 4f)
+                                        .background(Color.Red)
+                                ) {
+                                    Image(
+                                        modifier = Modifier.fillMaxSize(),
+                                        bitmap = croppedBitmap.value!!.asImageBitmap(),
+                                        contentDescription = null
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }

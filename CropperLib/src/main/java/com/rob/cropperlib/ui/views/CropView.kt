@@ -50,6 +50,7 @@ val maximalScale = mutableStateOf(5f)
 @Composable
 fun CropView(
     modifier: Modifier = Modifier,
+    croppedBitmap: (Bitmap)->Unit,
     cropBoarderColor: Color = Color.Yellow,
     backgroundColor: Color = Color.White,
     toolbarColor: Color = Color.White,
@@ -219,6 +220,7 @@ fun CropView(
                 }
             }
             if (croppedImage != null) {
+                croppedBitmap(croppedImage!!)
                 Box(
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
