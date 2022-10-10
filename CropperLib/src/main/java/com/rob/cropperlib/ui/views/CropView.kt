@@ -6,10 +6,7 @@ import androidx.compose.foundation.gestures.*
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -29,6 +26,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.airbnb.lottie.compose.*
 import com.rob.cropperlib.R
+import kotlin.math.roundToInt
 import kotlin.properties.Delegates
 
 
@@ -72,6 +70,10 @@ fun CropView(
         ) {
             val lifecycleOwner = LocalLifecycleOwner.current
 
+            var croppedImage by remember {
+                mutableStateOf<Bitmap?>(null)
+            }
+
 
             containerWidth = with(LocalDensity.current) { maxWidth.toPx() }
             containerHeight = with(LocalDensity.current) { maxHeight.toPx() }
@@ -93,6 +95,13 @@ fun CropView(
                         maximalScale.value = maxScale
                         zoomToCropAreaBounds(minimalScale.value, maximalScale.value, aspectRatio)
                         moveToCenter()
+                        croppedImage = cropImage(
+                            bitmap,
+                            cropAreaBounds,
+                            offsetX.value,
+                            offsetY.value,
+                            scale.value
+                        )
                     }
                 }
                 lifecycleOwner.lifecycle.addObserver(observer)
@@ -101,7 +110,6 @@ fun CropView(
                     lifecycleOwner.lifecycle.removeObserver(observer)
                 }
             }
-
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -121,8 +129,14 @@ fun CropView(
                                     offsetY.value *= zoom
                                 }
                                 moveToCropAreaPosition(minScale, maxScale, aspectRatio)
+                                croppedImage = cropImage(
+                                    bitmap,
+                                    cropAreaBounds,
+                                    offsetX.value,
+                                    offsetY.value,
+                                    scale.value
+                                )
                             }
-
                         },
                     onDraw = {
                         val canvasWidth = size.width
@@ -141,7 +155,6 @@ fun CropView(
                         }) {
                             drawImage(bitmap.asImageBitmap(), topLeft = cropAreaBounds.center)
                         }
-
                         clipPath(rectPath, clipOp = ClipOp.Difference) {
                             drawRect(
                                 color = backgroundPrimaryInverseOpacity50,
@@ -203,6 +216,22 @@ fun CropView(
                     )
                     .background(backgroundPrimaryOpacity50)) {
                     Loader(modifier = Modifier.align(Alignment.Center))
+                }
+            }
+            if (croppedImage != null) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(10.dp)
+                        .width(maxWidth / 3)
+                        .aspectRatio(3 / 4f)
+                        .background(Color.Red)
+                ) {
+                    Image(
+                        modifier = Modifier.fillMaxSize(),
+                        bitmap = croppedImage!!.asImageBitmap(),
+                        contentDescription = null
+                    )
                 }
             }
         }
@@ -278,5 +307,21 @@ private fun zoomToCropAreaBounds(minScale: Float, maxScale: Float, aspectRatio: 
 private fun moveToCenter() {
     offsetX.value = -imageWidth / 2f * scale.value
     offsetY.value = -imageHeight / 2f * scale.value
+}
+
+private fun cropImage(bitmap: Bitmap, overlay: Rect, offsetX: Float, offsetY: Float, scale: Float) : Bitmap?{
+    var croppedImage: Bitmap? = null
+    try {
+        croppedImage = Bitmap.createBitmap(
+            bitmap,
+            ((-offsetX - overlay.width / 2) / scale).roundToInt(),
+            ((-offsetY - overlay.height / 2) / scale).roundToInt(),
+            (overlay.width / scale).roundToInt(),
+            (overlay.height / scale).roundToInt()
+        )
+    } catch (e: Exception) {
+        e.printStackTrace()
+    }
+    return croppedImage
 }
 
