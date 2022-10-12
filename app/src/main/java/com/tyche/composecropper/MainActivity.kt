@@ -111,8 +111,6 @@ class MainActivity : ComponentActivity() {
                                 withToolbarTitle = {
                                     Text(text = "Title", fontWeight = FontWeight.Bold)
                                 },
-                                progressLabel = "Photo is being processed",
-                                shouldShowOverlay = shouldShowOverlay,
                                 bitmap = bitmap.value,
                                 croppedBitmap = {
                                     croppedBitmap.value = it
