@@ -71,7 +71,6 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colors.background
                 ) {
-                    var shouldShowOverlay by remember { mutableStateOf(false)}
                     Column(modifier = Modifier.wrapContentSize()) {
                         Text(modifier = Modifier.clickable {
                             pickMedia.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
@@ -93,16 +92,13 @@ class MainActivity : ComponentActivity() {
                                         modifier = Modifier
                                             .clickable {
                                                 compose.value = false
-                                                shouldShowOverlay = false
                                             }
                                             .padding(16.dp)
                                     )
                                 },
                                 withToolbarRightBtn = {
                                     Text(modifier = Modifier
-                                        .clickable {
-                                            shouldShowOverlay = true
-                                        }
+                                        .clickable {}
                                         .padding(16.dp),
                                         text = "Done",
                                         color = Color.White,
@@ -116,14 +112,14 @@ class MainActivity : ComponentActivity() {
                                     croppedBitmap.value = it
                                 }
                             )
-                            if (croppedBitmap.value != null){
+                            if (croppedBitmap.value != null) {
                                 Box(
                                     modifier = Modifier
-                                        .align(Alignment.TopEnd)
+                                        .align(Alignment.BottomEnd)
                                         .padding(10.dp)
                                         .width(100.dp)
                                         .aspectRatio(3 / 4f)
-                                        .background(Color.Red)
+                                        .background(Color.Transparent)
                                 ) {
                                     Image(
                                         modifier = Modifier.fillMaxSize(),
