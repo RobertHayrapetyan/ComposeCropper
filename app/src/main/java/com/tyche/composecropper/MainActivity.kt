@@ -81,9 +81,7 @@ class MainActivity : ComponentActivity() {
                             CropView(
                                 modifier = Modifier.fillMaxSize(),
                                 cropBoarderColor = Color.White,
-
                                 backgroundColor = Color.Black,
-                                toolbarColor = Color.Transparent,
                                 bitmap = bitmap.value,
                                 croppedBitmap = {
                                     croppedBitmap.value = it

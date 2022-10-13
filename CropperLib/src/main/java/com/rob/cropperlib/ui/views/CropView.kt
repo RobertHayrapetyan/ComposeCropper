@@ -52,8 +52,6 @@ fun CropView(
     croppedBitmap: (Bitmap?) -> Unit,
     cropBoarderColor: Color = Color.Yellow,
     backgroundColor: Color = Color.Black,
-    toolbarColor: Color = Color.White,
-    toolbarHeight: Dp = 56.dp,
     bitmap: Bitmap? = null,
     maxScale: Float = 5f,
     minScale: Float = 0.1f,
