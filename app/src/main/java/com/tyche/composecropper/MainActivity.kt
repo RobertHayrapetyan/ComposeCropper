@@ -84,29 +84,6 @@ class MainActivity : ComponentActivity() {
 
                                 backgroundColor = Color.Black,
                                 toolbarColor = Color.Transparent,
-                                withToolbarLeftBtn = {
-                                    Icon(
-                                        painter = painterResource(id = R.drawable.ic_baseline_arrow_back_ios_24),
-                                        tint = Color.White,
-                                        contentDescription = null,
-                                        modifier = Modifier
-                                            .clickable {
-                                                compose.value = false
-                                            }
-                                            .padding(16.dp)
-                                    )
-                                },
-                                withToolbarRightBtn = {
-                                    Text(modifier = Modifier
-                                        .clickable {}
-                                        .padding(16.dp),
-                                        text = "Done",
-                                        color = Color.White,
-                                        fontWeight = FontWeight.Bold)
-                                },
-                                withToolbarTitle = {
-                                    Text(text = "Title", fontWeight = FontWeight.Bold)
-                                },
                                 bitmap = bitmap.value,
                                 croppedBitmap = {
                                     croppedBitmap.value = it

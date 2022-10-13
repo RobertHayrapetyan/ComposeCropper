@@ -54,9 +54,6 @@ fun CropView(
     backgroundColor: Color = Color.Black,
     toolbarColor: Color = Color.White,
     toolbarHeight: Dp = 56.dp,
-    withToolbarLeftBtn: @Composable (() -> Unit)? = null,
-    withToolbarRightBtn: @Composable (() -> Unit)? = null,
-    withToolbarTitle: @Composable (() -> Unit)? = null,
     bitmap: Bitmap? = null,
     maxScale: Float = 5f,
     minScale: Float = 0.1f,
@@ -173,31 +170,6 @@ fun CropView(
                         )
                     }
                 )
-            }
-
-            Column(
-                modifier
-                    .fillMaxWidth()
-                    .align(Alignment.TopCenter)
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(toolbarHeight)
-                        .background(toolbarColor),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    if (withToolbarLeftBtn != null) {
-                        withToolbarLeftBtn()
-                    }
-                    if (withToolbarTitle != null) {
-                        withToolbarTitle()
-                    }
-                    if (withToolbarRightBtn != null) {
-                        withToolbarRightBtn()
-                    }
-                }
             }
         }
     }
